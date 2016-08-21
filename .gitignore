@@ -1,5 +1,5 @@
 *.csv
-config.json
+.env
 template/
 base/
 Vendor/
