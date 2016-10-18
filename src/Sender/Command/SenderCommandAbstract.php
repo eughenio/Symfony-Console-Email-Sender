@@ -5,6 +5,8 @@ namespace Sender\Command;
 use Mailgun\Mailgun;
 use League\Csv\Reader;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -54,8 +56,10 @@ class SenderCommandAbstract extends Command
    * @param  OutputInterface $output     [Console Ouput]
    * @return [string]                    [String with response from Mailgun]
    */
-  protected function senderMailgun($base, $html, $output)
+  protected function senderMailgun($base, $html, $subject, $output)
   {
+    date_default_timezone_set();
+
     $mailgun = new Mailgun($_ENV['MAILGUN_KEY']);
 
     foreach ($base as $value) {
@@ -64,13 +68,45 @@ class SenderCommandAbstract extends Command
       $parameters = [
         'from'    => 'Daniella e Eughenio <daniellaeeughenio@caseicom.vc>',
         'to'      => $value['email'],
-        'subject' => 'Save the Date: Daniella e Eughenio irão se casar',
+        'subject' => $subject,
         'html'    => $template,
       ];
 
       $send = $mailgun->sendMessage($_ENV['MAILGUN_DOMAIN'], $parameters);
 
       $output->writeln("<info>".$value['email']." - ".$send->http_response_code." - ".$send->http_response_body->message."</info>");
+    }
+  }
+
+  protected function senderSwift($base, $html, $subject, $output)
+  {
+    $transport = \Swift_SmtpTransport::newInstance($_ENV['SWIFT_SMTP'], $_ENV['SWIFT_PORT'], $_ENV['SWIFT_CRYPT'])
+      ->setUsername($_ENV['SWIFT_USER'])
+      ->setPassword($_ENV['SWIFT_PASS'])
+    ;
+
+    $mailer = \Swift_Mailer::newInstance($transport);
+    $attachment = \Swift_Attachment::fromPath('/Users/eughenio/Sites/convite/attach/Com05-TBTS.jpg');
+
+    foreach ($base as $value) {
+      $message = \Swift_Message::newInstance();
+      $template = $this->renderTemplate($html, $value);
+
+      $message
+        ->setSubject($subject)
+        ->setFrom(array($_ENV['SWIFT_USER'] => $_ENV['SWIFT_NAME']))
+        ->setTo(array($value['email']))
+        ->setBody($template, 'text/html')
+        ->attach($attachment)
+      ;
+
+      try {
+        $result = $mailer->send($message);
+      } catch (Exception $e) {
+        $output->writeln("<error>{$value['email']} - {$e->getMessage()} - {$e->getCode()}</error>");
+      }
+
+      $output->writeln("<info>{$value['email']} - Sucesso</info>");
     }
   }
 }
