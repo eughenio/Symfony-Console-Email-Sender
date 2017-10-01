@@ -1,5 +1,5 @@
-*.csv
 .env
-template/
-base/
-Vendor/
+bases/*
+templates/*
+vendor/
+composer.lock
